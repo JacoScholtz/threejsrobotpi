@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<title>three.js webgl - skinning and morphing</title>
+		<meta charset="utf-8">
+		<meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+		<link type="text/css" rel="stylesheet" href="main.css">
+		<style>
+			body {
+				color: #222;
+			}
+
+			a {
+				color: #2fa1d6;
+			}
+
+			p {
+				max-width: 600px;
+				margin-left: auto;
+				margin-right: auto;
+				padding: 0 2em;
+			}
+		</style>
+	</head>
+
+	<!-- <script src="../build/socket.io.js"></script> include socket.io client side script -->
+
+	<body>
+		<div id="info">
+			<p>Veniamin's Robot</p>
+			<p>
+				<div id="testv1"></div>&nbsp;
+				<button id="b1">B1</button>&nbsp;
+				<button id="b2">B2</button>&nbsp;
+				<button id="b3">B3</button>&nbsp;
+				<button id="b4">B4</button>&nbsp;
+			</p>
+		</div>
+
+		<script type="module">
+
+
+
+			import * as THREE from '../build/three.module.js';
+
+			import Stats from './jsm/libs/stats.module.js';
+			// === import { GUI } from './jsm/libs/dat.gui.module.js';
+
+			import { GLTFLoader } from './jsm/loaders/GLTFLoader.js';
+
+			var container, stats, clock
+			// === var gui
+			var mixer, actions, activeAction, previousAction;
+			var camera, scene, renderer, model, face;
+
+			var api = { state: 'Idle' };
+
+			init();
+			animate();
+
+			function init() {
+
+				container = document.createElement( 'div' );
+				document.body.appendChild( container );
+
+				camera = new THREE.PerspectiveCamera( 45, window.innerWidth / window.innerHeight, 0.25, 100 );
+				camera.position.set( - 5, 3, 10 );
+				camera.lookAt( new THREE.Vector3( 0, 2, 0 ) );
+
+				scene = new THREE.Scene();
+				scene.background = new THREE.Color( 0xe0e0e0 );
+				scene.fog = new THREE.Fog( 0xe0e0e0, 20, 100 );
+
+				clock = new THREE.Clock();
+
+				// lights
+
+				var light = new THREE.HemisphereLight( 0xffffff, 0x444444 );
+				light.position.set( 0, 20, 0 );
+				scene.add( light );
+
+				light = new THREE.DirectionalLight( 0xffffff );
+				light.position.set( 0, 20, 10 );
+				scene.add( light );
+
+				// ground
+
+				var mesh = new THREE.Mesh( new THREE.PlaneBufferGeometry( 2000, 2000 ), new THREE.MeshPhongMaterial( { color: 0x999999, depthWrite: false } ) );
+				mesh.rotation.x = - Math.PI / 2;
+				scene.add( mesh );
+
+				var grid = new THREE.GridHelper( 200, 40, 0x000000, 0x000000 );
+				grid.material.opacity = 0.2;
+				grid.material.transparent = true;
+				scene.add( grid );
+
+				// model
+
+				var loader = new GLTFLoader();
+				loader.load( 'models/gltf/RobotExpressive/RobotExpressive.glb', function ( gltf ) {
+
+					model = gltf.scene;
+					scene.add( model );
+
+					createGUI( model, gltf.animations );
+					//noGUIStart();
+
+				}, undefined, function ( e ) {
+
+					console.error( e );
+
+				} );
+
+				renderer = new THREE.WebGLRenderer( { antialias: true } );
+				renderer.setPixelRatio( window.devicePixelRatio );
+				renderer.setSize( window.innerWidth, window.innerHeight );
+				renderer.gammaOutput = true;
+				renderer.gammaFactor = 2.2;
+				container.appendChild( renderer.domElement );
+
+				window.addEventListener( 'resize', onWindowResize, false );
+
+				// stats
+				stats = new Stats();
+				container.appendChild( stats.dom );
+
+			}
+
+			function createGUI( model, animations ) {
+
+				var states = [ 'Idle', 'Walking', 'Running', 'Dance', 'Death', 'Sitting', 'Standing' ];
+				var emotes = [ 'Jump', 'Yes', 'No', 'Wave', 'ThumbsUp' ];
+
+				// === gui = new GUI();
+
+				mixer = new THREE.AnimationMixer( model );
+
+				actions = {};
+
+				for ( var i = 0; i < animations.length; i ++ ) {
+
+					var clip = animations[ i ];
+					var action = mixer.clipAction( clip );
+					actions[ clip.name ] = action;
+
+					if ( emotes.indexOf( clip.name ) >= 0 || states.indexOf( clip.name ) >= 4 ) {
+
+						action.clampWhenFinished = true;
+						action.loop = THREE.LoopOnce;
+
+					}
+
+				}
+
+				// states
+
+				// === var statesFolder = gui.addFolder( 'States' );
+
+				// === var clipCtrl = statesFolder.add( api, 'state' ).options( states );
+
+				//clipCtrl.onChange( function () {
+				//	fadeToAction( api.state, 0.5 );
+				//} );
+
+				// === statesFolder.open();
+
+				// emotes
+
+				// === var emoteFolder = gui.addFolder( 'Emotes' );
+
+				function createEmoteCallback( name ) {
+
+					api[ name ] = function () {
+
+						fadeToAction( name, 0.2 );
+
+						mixer.addEventListener( 'finished', restoreState );
+
+					};
+
+					// === emoteFolder.add( api, name );
+
+				}
+
+				function restoreState() {
+
+					mixer.removeEventListener( 'finished', restoreState );
+
+					fadeToAction( api.state, 0.2 );
+
+				}
+
+				for ( var i = 0; i < emotes.length; i ++ ) {
+
+					createEmoteCallback( emotes[ i ] );
+
+				}
+
+				// === emoteFolder.open();
+
+				// expressions
+
+				face = model.getObjectByName( 'Head_2' );
+
+				var expressions = Object.keys( face.morphTargetDictionary );
+				// === var expressionFolder = gui.addFolder( 'Expressions' );
+
+				//for ( var i = 0; i < expressions.length; i ++ ) {
+					// === expressionFolder.add( face.morphTargetInfluences, i, 0, 1, 0.01 ).name( expressions[ i ] );
+				//}
+
+				activeAction = actions[ api.state ];
+				activeAction.play();
+
+				// === expressionFolder.open();
+
+			}
+
+			function fadeToAction( name, duration ) {
+
+				previousAction = activeAction;
+				activeAction = actions[ name ];
+
+				if ( previousAction !== activeAction ) {
+
+					previousAction.fadeOut( duration );
+
+				}
+
+				activeAction
+					.reset()
+					.setEffectiveTimeScale( 1 )
+					.setEffectiveWeight( 1 )
+					.fadeIn( duration )
+					.play();
+
+			}
+
+			function onWindowResize() {
+
+				camera.aspect = window.innerWidth / window.innerHeight;
+				camera.updateProjectionMatrix();
+
+				renderer.setSize( window.innerWidth, window.innerHeight );
+
+			}
+
+			//
+
+			function animate() {
+
+				var dt = clock.getDelta();
+
+				if ( mixer ) mixer.update( dt );
+
+				//requestAnimationFrame( animate );
+				setTimeout( function() {
+					requestAnimationFrame( animate );
+				}, 1000 / 30 );
+
+				renderer.render( scene, camera );
+
+				stats.update();
+
+			}
+
+			window.addEventListener("load", function(){ //when page loads
+
+				const ws = new WebSocket('ws://localhost:40004/');
+				ws.onopen = function() {
+					console.log('WebSocket Client Connected');
+					ws.send('Hi this is web client.');
+				};
+				ws.onmessage = function(e) {
+					console.log("Received: '" + e.data + "'");
+					document.getElementById("testv1").innerText = e.data;
+					try{
+						var payload = JSON.parse(e.data);
+						if(payload.type == 'state'){
+							api.state = payload.value;
+							fadeToAction( api.state, 0.5 );
+						}
+						if(payload.type == 'emote'){
+							api[payload.value]();
+						}
+					} catch(err) {
+
+					}
+				};
+
+				var but1 = document.getElementById("b1");
+				but1.addEventListener("click", function() {
+					ws.send('B1');
+					api.state = 'Death';
+					fadeToAction( api.state, 0.5 );
+				});
+
+				var but2 = document.getElementById("b2");
+				but2.addEventListener("click", function() {
+					ws.send('B2');
+					api['ThumbsUp']();
+					//fadeToAction( 'ThumbsUp', 0.2 );
+					//mixer.addEventListener( 'finished', restoreState );
+				});
+
+
+				var but3 = document.getElementById("b3");
+				but3.addEventListener("click", function() {
+					console.log('b3');
+					face.morphTargetInfluences[1] = 0.8;
+				});
+				var but4 = document.getElementById("b4");
+				but4.addEventListener("click", function() {
+					console.log('b4');
+					face.morphTargetInfluences[1] = 0.2;
+				});
+
+
+
+
+
+			});
+
+
+
+
+
+		</script>
+
+	</body>
+</html>

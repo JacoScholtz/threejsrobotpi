@@ -1,0 +1,10 @@
+node_modules/*
+log/*
+*.log
+.idea
+.vs
+.DS_Store
+*/.DS_Store
+package-lock.json
+temp/*
+
