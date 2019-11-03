@@ -282,6 +282,25 @@
 						if(payload.type == 'emote'){
 							api[payload.value]();
 						}
+						//[ 'Idle', 'Walking', 'Running', 'Dance', 'Death', 'Sitting', 'Standing' ];
+						//[ 'Jump', 'Yes', 'No', 'Wave', 'ThumbsUp' ];
+
+						if(payload.type == 'button'){
+							if(payload.id == 7){api.state = 'Idle'; fadeToAction( api.state, 0.5 );};
+							if(payload.id == 3){api.state = 'Walking'; fadeToAction( api.state, 0.5 );};
+							if(payload.id == 4){api.state = 'Running'; fadeToAction( api.state, 0.5 );};
+							if(payload.id == 12){api.state = 'Dance'; fadeToAction( api.state, 0.5 );};
+							if(payload.id == 11){api.state = 'Death'; fadeToAction( api.state, 0.5 );};
+							if(payload.id == 6){api.state = 'Sitting'; fadeToAction( api.state, 0.5 );};
+							if(payload.id == 2){api['Jump']();};
+							if(payload.id == 13){api['Yes']();};
+							if(payload.id == 5){api['No']();};
+							if(payload.id == 1){api['Wave']();};
+							if(payload.id == 8){api['ThumbsUp']();};
+							if(payload.id == 10){face.morphTargetInfluences[1] = 0;};
+							if(payload.id == 9){face.morphTargetInfluences[1] = 1;};
+						}
+						
 					} catch(err) {
 
 					}
