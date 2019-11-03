@@ -3,9 +3,19 @@
 // node robotserver.js
 // http://localhost:40004/examples/webgl_animation_skinning_morph.html
 // http://localhost:40004/examples/robot.html
-
+// sudo apt-get install firefox-esr
+// chromium-browser  --enable-webgl --ignore-gpu-blacklist
 
 // https://www.w3schools.com/nodejs/nodejs_raspberrypi_webserver_websocket.asp
+
+/*
+1. use raspi-config to enable OpenGL (Full KMS)
+2. remove "--disable-gpu-compositing'' from /etc/chromium-browser/customizations/00-rpi-var
+
+is all you need to do to get the https://get.webgl.org cube spinning.
+*/
+ 
+
 
 //This server is for non frontend APIs
 var express = require('express');
@@ -21,9 +31,9 @@ var _ = require('lodash');
 
 const WebSocket = require('ws');
 
-//var Gpio = require('onoff').Gpio; //include onoff to interact with the GPIO
+var Gpio = require('onoff').Gpio; //include onoff to interact with the GPIO
 //var LED = new Gpio(4, 'out'); //use GPIO pin 4 as output
-//var pushButton = new Gpio(17, 'in', 'both'); //use GPIO pin 17 as input, and 'both' button presses, and releases should be handled
+var pushButton = new Gpio(17, 'in', 'both'); //use GPIO pin 17 as input, and 'both' button presses, and releases should be handled
 
 
 //var methodOverride = require('method-override');
@@ -102,7 +112,7 @@ wss.on('connection', function(ws, req){
 
 server.listen(app.get('port'), function(){
     console.log('listening on port ' + app.get('port'));
-    timerint = setTimeout(timerf, 2*1000);
+    //timerint = setTimeout(timerf, 2*1000);
 });
 
 var broadcast = function(data){
@@ -121,6 +131,7 @@ var states = [ 'Idle', 'Walking', 'Running', 'Dance', 'Death', 'Sitting', 'Stand
 var emotes = [ 'Jump', 'Yes', 'No', 'Wave', 'ThumbsUp' ];
 var expressions = ['Angry', 'Surprised', 'Sad'];
 
+/*
 var state_id = 0;
 var timerint;
 var timerf = function(){
@@ -134,23 +145,27 @@ var timerf = function(){
     broadcast(JSON.stringify(payload));
     timerint = setTimeout(timerf, 3*1000);
 }
+*/
 
-// pushButton.watch(function (err, value) { //Watch for hardware interrupts on pushButton
-//     if (err) { //if an error
-//         console.error('There was an error', err); //output error message to console
-//         return;
-//     }
-//     var payload = {};
-//     payload.type = 'emote';
-//     payload.value = 'Wave';
-//     broadcast(JSON.stringify(payload));
-// });
+ pushButton.watch(function (err, value) { //Watch for hardware interrupts on pushButton
+     if (err) { //if an error
+         console.error('There was an error', err); //output error message to console
+         return;
+     }
+     console.log('pushbutton ' + value);
+     if(value == 1){
+         var payload = {};
+         payload.type = 'emote';
+         payload.value = 'Jump';
+         broadcast(JSON.stringify(payload));
+     }
+ });
 
 process.on('SIGINT', function () { //on ctrl+c
     wss.close();
     //LED.writeSync(0); // Turn LED off
     //LED.unexport(); // Unexport LED GPIO to free resources
-    //pushButton.unexport(); // Unexport Button GPIO to free resources
+    pushButton.unexport(); // Unexport Button GPIO to free resources
     process.exit(); //exit completely
 });
 
